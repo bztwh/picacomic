@@ -1,5 +1,5 @@
 import json
-from flask import Flask, abort, redirect
+from flask import Flask, abort, redirect, request
 import sqlite3
 from urllib import parse
 app = Flask(__name__)
@@ -7,6 +7,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
+    print(request.headers)
     return '<div><a href="gen/0">gentai</a></div>\n<div><a href="pica/0">pica</a></div>\n'
 
 
@@ -37,7 +38,7 @@ def getbook(book_id):
     if book_id == "favicon.ico" or ans is None:
         abort(404)
         return
-    div = '<div><img src="http://anki.org:1080/static/{}"/></div>\n'
+    div = '<div><img src="https://s3.picacomic.com/static/{}"/></div>\n'
     ans = json.loads(ans[0])
     res = '<meta name="viewport" content="width=device-width,initial-scale=1" />\n'
     for _ in ans:
@@ -59,6 +60,32 @@ def pages2(page):
         res += '<div><a href="/gen/{}">next Page</a></div>\n'.format(page + 1)
     return res
 
+board = """
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>hello word</title>
+    <script src="https://bbs.gent41.com/assets/javascript/libwebp.js"></script>
+</head>
+
+<body>
+    <script>
+        var tmp = {1};
+        var id = {2};
+        for (var i = 1; i <= tmp; i++) {
+            document.write('<img id="' + i + '">');
+        }
+        for (var i = 1; i <= tmp; i++) {
+            var srcs = 'https://bbs.gent41.com/g-meta-srv/img/' + Math.floor(id / 1000) + '/' + id + '/' + i + '.webp';
+            loadWebP(document.getElementById('' + i), srcs);
+        }
+    </script>
+</body>
+
+</html>
+"""
 
 @app.route('/gen/id/<book_id>')
 def getbook2(book_id):
@@ -67,16 +94,13 @@ def getbook2(book_id):
         return
     db = sqlite3.connect("data.db")
     cur = db.cursor()
-    ans = cur.execute("select data,pages from crew2 where id='{}';".format(book_id)).fetchone()
+    ans = cur.execute("select id,pages from crew2 where id='{}';".format(book_id)).fetchone()
     if book_id == "favicon.ico" or ans is None:
         abort(404)
         return
-    data, page = ans[0], int(ans[1])
-    div = '<div><img src="https://gentai.org/img/thumbs/{}/{}.webp"/></div>\n'
-    res = '<meta name="viewport" content="width=device-width,initial-scale=1" />\n'
-    for _ in range(1, page + 1):
-        res += div.format(data, _)
-    return res
+    pId, page = ans[0], int(ans[1])
+
+    return board.replace("{1}", str(page)).replace("{2}", str(pId))
 
 @app.route('/s/<key>')
 def search(key):
@@ -98,7 +122,6 @@ def search(key):
     # if len(ans):
     #     res += '<div><a href="/pica/{}">next Page</a></div>\n'.format(page + 1)
     return res
-
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)

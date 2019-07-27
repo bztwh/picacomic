@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import re
+import os
+
 import hmac
 import time
 import json
 import uuid
+import threading
 import zipfile
 import urllib3
 import sqlite3
@@ -36,12 +39,13 @@ header = {
         "Content-Type": "application/json; charset=UTF-8",
         "User-Agent": "okhttp/3.8.1",
 }
+proxies = None
 
 
 class Pica:
 
     def __init__(self, account, password):
-        self.path = "D:/pic/" if platform.system() == 'Windows' else "/mnt/usb/gen/"
+        self.path = "D:/pic/" if platform.system() == 'Windows' else "/mnt/usb/"
         self.account = account
         self.password = password
         self.header = header.copy()
@@ -49,7 +53,6 @@ class Pica:
         self.header["nonce"] = self.uuid_s
         self.db = sqlite3.connect("data.db")
         self.communicate_db("create table account (email text PRIMARY KEY NOT NULL, password text, key text);")
-        # self.communicate_db("create table crew (id text PRIMARY KEY NOT NULL, title text, );")
         self.communicate_db("create table crew (id text PRIMARY KEY NOT NULL,name text,data text);")
         self.check()
 
@@ -78,8 +81,6 @@ class Pica:
         except json.JSONDecodeError:
             logging.error(__res.text)
             raise json.JSONDecodeError
-        # print(__res)
-        # print(token)
         if __res["code"] != 200:
             token = self.login()
             self.communicate_db("update test set key='{0}' where email='{1}';".format(token, self.account))
@@ -88,7 +89,7 @@ class Pica:
         ts = str(int(time.time()))
         self.header["time"] = ts
         self.header["signature"] = self.encrypt(url, ts, "POST", self.uuid_s)
-        return requests.post(url=url, data=data, headers=self.header, verify=False)
+        return requests.post(url=url, data=data, headers=self.header, verify=False, proxies=proxies)
 
     def get(self, url):
         ts = str(int(time.time()))
@@ -96,7 +97,13 @@ class Pica:
         self.header["signature"] = self.encrypt(url, ts, "GET", self.uuid_s)
         header_tmp = self.header.copy()
         header_tmp.pop("Content-Type")
-        return requests.get(url=url, headers=header_tmp, verify=False)
+        # print(url)
+        # print(self.header)
+        while True:
+            try:
+                return requests.get(url=url, headers=header_tmp, verify=False, proxies=proxies)
+            except:
+                time.sleep(10)
 
     @staticmethod
     def encrypt(url, ts, method, uuid_ss):
@@ -128,48 +135,67 @@ class Pica:
         url = global_url + api
         return self.get(url)
 
-    def block(self, __page, bl):
-        api = "comics?page={0}&c={1}&s=ua".format(__page, bl)
+    def block(self, __page, __word):
+        """
+        bl:妹妹系,性轉換,
+        """
+        api = "comics?page={0}&c={1}&s=ua".format(__page, parse.quote(__word))
         url = global_url + api
         return self.get(url)
 
+    def searchs(self, __page, __word):
+        url = global_url + "comics/search?page={0}&q={1}".format(__page, parse.quote(__word))
+        return self.get(url)
+
+    def tags(self, __page, __word):
+        url = global_url + "comics?page={}&t={}".format(__page, parse.quote(__word)) 
+        return self.get(url)
+
     def comics(self, __id, __name):
+        print(__name, time.ctime())
         api = global_url + "comics/{0}/eps?".format(__id) + "page={0}"
         url = api.format(1)
-        # _return = []
+        _return = []
         __pages = self.get(url).json()["data"]["eps"]["pages"]
-        for _ in range(1, __pages + 1):  # __pages + 1
+        for _ in range(1, 2):  # __pages + 1
             url = api.format(_)
             __res = self.get(url).json()["data"]["eps"]["docs"]
             for __ in __res:
-                if len(self.communicate_db("select * from crew where id='{}';".format(__["_id"]))) > 0:
-                    continue
-                _name = re.sub("[|:/*]*", "", __name + __["title"])
-                logging.info(_name)
-                # _return.append({"name": _name, "fid": __id, "order": __["order"], "id": __["_id"]})
-                _pic = self.comic(__["order"], __id)
-                self.communicate_db(insert.format(__["_id"], _name, json.dumps(_pic)))
-                logging.info("done!!!")
-        # return _return
+                _name = re.sub("[|:/*\\s!?]*", "", __name + __["title"])
+                print(_name)
+                _return.append({"name": _name, "fid": __id, "order": __["order"], "id": __["_id"]})
+        return _return
 
-    def comic(self, __order, __id):
+    def comic(self, __order, __id, _name):
         api = global_url + 'comics/{0}/order/{1}/pages'.format(__id, __order) + '?page={0}'
         url = api.format(1)
         _return = []
         __pages = self.get(url).json()["data"]["pages"]["pages"]
+        try:
+            os.makedirs("D:/pic/{}".format(_name))
+        except FileExistsError:
+            pass
         for _ in range(1, __pages + 1):  # __pages + 1
             url = api.format(_)
             __res = self.get(url).json()["data"]["pages"]["docs"]
             for __ in __res:
                 _tmp = __["media"]
-                _return.append(_tmp["path"])  # "name": _tmp["originalName"], "url": _tmp["path"]
-        # _tmp["fileServer"] + "/static/" +  https://storage1.picacomic.com/static/
-        return _return
+                file_name = "D:/pic/{}/{}".format(_name, _tmp["originalName"])
+                if os.path.exists(file_name) and os.path.getsize(file_name) != 0:
+                    continue
+                with open(file_name, "wb") as out:
+                    _pic = self.get_picture("https://storage1.picacomic.com/static/" + _tmp["path"])
+                    out.write(_pic)
+        print(_name, time.ctime(), "done")
+        return _name, time.ctime(), "done"
+
 
     def get_picture(self, url):
         while True:
             try:
                 __a = self.get(url)
+                if __a.status_code != 200:
+                    continue
                 break
             except requests.exceptions.ConnectionError:
                 logging.error("get picture failed: " + url)
@@ -181,17 +207,38 @@ class Pica:
         url = api.format(1)
         __pages = self.get(url).json()["data"]["comics"]["pages"]
         _return = []
-        for _ in range(1, 2):  # __pages + 1
+        for _ in range(1, 3):  # __pages + 1
             url = api.format(_)
             __res = self.get(url).json()["data"]["comics"]["docs"]
             for __ in __res:
+                if __["likesCount"] < 200:
+                    continue
+                if __["pagesCount"] / __["epsCount"] > 60 or __["epsCount"] > 10:
+                    continue
                 _return.append({"name": __["title"], "id": __["_id"]})
         return _return
-    
-    # def dowload(self, word):
-    #     __res = self.search(word)
-    #     __out_zip = zipfile.ZipFile(s.path + "out.zip", "x", compression=zipfile.ZIP_DEFLATED)
 
+    def deal_data(self, __word, methods):
+        skip = ["WEBTOON"]
+        cnt = 0
+        __pages = methods(1, __word)
+        __pages = __pages.json()["data"]["comics"]["pages"]
+        print(__pages)
+        _return = []
+        for _ in range(1, 20):  # __pages + 1
+            __res = methods(_, __word).json()["data"]["comics"]["docs"]
+            for __ in __res:
+                if len([i for i in skip if i in __['categories']]):
+                    continue
+                if __["likesCount"] < 20:
+                    continue
+                # if __["pagesCount"] / __["epsCount"] > 60 or __["epsCount"] > 10:
+                #     continue
+                print(__["_id"], cnt)
+                cnt += 1
+                _return.append({"name": __["title"], "id": __["_id"]})
+                time.sleep(0.1)
+        return _return
 
 if __name__ == "__main__":
     insert = """
@@ -199,30 +246,15 @@ if __name__ == "__main__":
     """
     s = Pica("robottest@163.com", "robottest")
     div = '<div><img src="{}"/></div>\n'
-    want = "少女映画"
-    res = s.search(want)
+    res = s.get("https://picaapi.picacomic.com/comics/5ccda0cbcba5a62acb03d798")
+    want = "校服"
+    # res = s.search(want)
+    res = s.deal_data(want, s.tags)
     comic = []
-    # out_zip = zipfile.ZipFile(s.path + "out.zip", "x", compression=zipfile.ZIP_DEFLATED)
     for i in res:
         logging.info(json.dumps(i))
-        s.comics(i["id"], i["name"])
-    # for i in comic:
-        # if int(time.strftime("%H%M")) > 2300:
-        #     break
-        # pic = s.comic(i["order"], i["fid"])
-        # logging.info("start: {0} counts: {1}".format(i["name"], len(pic)))
-        # data = json.dumps(pic)
-        # print(data)
-        # s.communicate_db(insert.format(i["id"], i["name"], data))
-        # work = s.path
-        # for j in pic:
-            # logging.info("\t" + j["url"])
-            # print("https://storage1.picacomic.com/static/" + j["url"])
-
-            # pic_b = s.get_picture(j["url"])
-            # open(work + "tmp", "wb").write(pic_b)
-            # with zipfile.ZipFile(s.path + "out.zip", "a", compression=zipfile.ZIP_DEFLATED) as out_zip:
-            #     with out_zip.open("{}/{}".format(i["name"], j["name"]), "w") as out:
-            #         out.write(pic_b)
-        # s.communicate_db("insert into crew (id) values ('{}')".format(i["id"]))
-        # break
+        comic += s.comics(i["id"], i["name"])
+    for i in comic:
+        threading.Thread(target=s.comic, args=(i["order"], i["fid"], i["name"])).start()
+        while len(list(threading.enumerate())) > 20:
+            time.sleep(10)

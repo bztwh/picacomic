@@ -3,9 +3,9 @@ import hashlib
 
 uuid = "28001bae24614ee5bae1c2ca5328aabc"
 api_key = "C69BAF41DA5ABD1FFEDC6D2FEA56B"
-secret_key = "~n}$S9$lGts=U)8zfL/R.PM9;4[3|@/CEsl~Kk!7?BYZ:BAa5zkkRBL7r|1/*Cr"
-version = "2.1.0.4"
-build_version = "39"
+secret_key = "~d}$Q7$eIni=V)9\\RK/P.RM4;9[7|@/CA}b~OW!3?EV`:<>M7pddUBL5n|0/*Cn"
+version = "2.2.0.0.1.1"
+build_version = "42"
 channel = 2
 header = {
         "api-key": "C69BAF41DA5ABD1FFEDC6D2FEA56B",
@@ -15,7 +15,7 @@ header = {
         "nonce": uuid,
         "signature": "encrypt",
         "app-version": version,
-        "app-uuid": "1b509109-476d-3790-a5f0-0acfeace9a5b",
+        "app-uuid": "cb69a7aa-b9a8-3320-8cf1-74347e9ee979",
         "app-platform": "android",
         "app-build-version": build_version
 }

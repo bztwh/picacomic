@@ -14,7 +14,7 @@ logging.basicConfig(filename='gen.log',
 
 db = sqlite3.connect("data.db")
 cur = db.cursor()
-
+sstart = 23232
 
 def communicate_db(sql):
     global cur
@@ -23,41 +23,55 @@ def communicate_db(sql):
         logging.info(str(__res))
         db.commit()
         return __res
-    except sqlite3.OperationalError:
+    except (sqlite3.OperationalError, sqlite3.IntegrityError):
         return []
 
-
-def search(word):
-    word = parse.quote(word)
-    __api = "https://gentai.org/?p={1}&q={0}"
-    __url = __api.format(word, 1)
-    __res = requests.get(__url).text
-    # print(len(re.findall("var x = (.*?)};", __res)))
-    # __res = re.findall("class\\=title(.*?)\\</a>", __res)
-    logging.info(__res)
-    pages = int(re.findall("p=(\\d+)", __res)[-1])
-    logging.info("pages: {}".format(pages))
-    for _ in range(1, pages + 1):
-        __url = __api.format(word, _)
-        __res = requests.get(__url).text
-        __res = re.findall("class\\=title(.*?)\\</a>", __res)
-        logging.info(json.dumps(__res))
-        for __ in __res:
-            idd = re.findall("/gallery/(\\d+)", __)[0]
-            name = __.split('"_blank">')[-1]
-            if len(communicate_db("select * from crew2 where id='{}';".format(idd))) > 0:
-                continue
-            # data = json.dumps(__["images"])
-            while True:
-                _res = requests.get("https://gentai.org/gallery/{}?view=1".format(idd))
-                if _res.status_code != 200:
-                    time.sleep(10)
-                    continue
+def get():
+    url = "https://bbs.gent41.com/viewtopic.php?t="
+    # start = int(communicate_db("select count(id) from crew2;")[0][0]) + 26
+    global sstart
+    for i in range(sstart, 35000):
+        sstart = i
+        tmp_url = url + str(i)
+        res = requests.get(tmp_url)
+        if res.status_code != 200:
+            logging.info("{},{}".format(i, "not found"))
+            continue
+        res = res.text
+        name = re.findall("<title>(.*?)- Gentai</title>", res)[0]
+        pId = re.findall("img/\\d+/(\\d+)/", res)
+        if len(pId) == 0:
+            continue
+        else:
+            pId = pId[0]
+        page = re.findall("start=(\\d+)", res)
+        tags = re.findall("text = '(.*?)'", res)
+        if len(tags) == 0:
+            try:
+                tags = re.findall('alt="图片"><br>([^<]+)', res)[0].strip()
+            except IndexError:
+                tags = ""
+        else:
+            tags = tags[0]
+        if len(page) == 0:
+            page = 0
+        else:
+            page = max(list(map(int, page)))
+        while True:
+            try:
+                res = requests.get(tmp_url + "&start=" + str(page)).text
+                total = max(list(map(int, re.findall("/g-meta-srv/img/\\d+/\\d+/(\\d+)", res))))
                 break
-            data = re.findall("/img/([0-9/]{10})", _res.text)[0]
-            page = re.findall("共(\\d+)", _res.text)[0]
-            communicate_db("insert into crew2(id,name,data,pages)values('{}','{}','{}',{});".format(idd, name, data, page))
+            except ValueError:
+                page -= 10
+        communicate_db("insert into crew2(id, name, pages, tags) values({},'{}',{}, '{}')".format(pId, name, total, tags))
+        logging.info("{},{},{},{},{}".format(i, pId, name, total, tags))
 
 if __name__ == "__main__":
-    communicate_db("create table crew2(id text PRIMARY KEY,name text,data text,pages integer);")
-    search("#")
+    while True:
+        try:
+            get()
+            break
+        except Exception as e:
+            logging.error(str(e))
+            time.sleep(120)
