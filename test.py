@@ -17,7 +17,8 @@ header = {
         "app-version": version,
         "app-uuid": "cb69a7aa-b9a8-3320-8cf1-74347e9ee979",
         "app-platform": "android",
-        "app-build-version": build_version
+        "app-build-version": build_version,
+        "User-Agent": "okhttp/3.8.1"
 }
 
 
