@@ -125,11 +125,11 @@ params:
   page: 分页，从1开始
   blockName: 分区名字，categories里面的title，如"嗶咔漢化"
   type: 排序依据
-    ua: 默认
-    dd: 新到旧
-    da: 旧到新
-    ld: 最多爱心
-    vd: 最多指名
+      ua: 默认
+      dd: 新到旧
+      da: 旧到新
+      ld: 最多爱心
+      vd: 最多指名
 response
 {
   "code": 200,
