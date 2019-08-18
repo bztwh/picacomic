@@ -240,21 +240,3 @@ class Pica:
                 time.sleep(0.1)
         return _return
 
-if __name__ == "__main__":
-    insert = """
-        insert into crew(id,name,data)values('{0}','{1}','{2}');
-    """
-    s = Pica("robottest@163.com", "robottest")
-    div = '<div><img src="{}"/></div>\n'
-    res = s.get("https://picaapi.picacomic.com/comics/5ccda0cbcba5a62acb03d798")
-    want = "校服"
-    # res = s.search(want)
-    res = s.deal_data(want, s.tags)
-    comic = []
-    for i in res:
-        logging.info(json.dumps(i))
-        comic += s.comics(i["id"], i["name"])
-    for i in comic:
-        threading.Thread(target=s.comic, args=(i["order"], i["fid"], i["name"])).start()
-        while len(list(threading.enumerate())) > 20:
-            time.sleep(10)
