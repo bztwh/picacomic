@@ -218,25 +218,3 @@ class Pica:
                 _return.append({"name": __["title"], "id": __["_id"]})
         return _return
 
-    def deal_data(self, __word, methods):
-        skip = ["WEBTOON"]
-        cnt = 0
-        __pages = methods(1, __word)
-        __pages = __pages.json()["data"]["comics"]["pages"]
-        print(__pages)
-        _return = []
-        for _ in range(1, 20):  # __pages + 1
-            __res = methods(_, __word).json()["data"]["comics"]["docs"]
-            for __ in __res:
-                if len([i for i in skip if i in __['categories']]):
-                    continue
-                if __["likesCount"] < 20:
-                    continue
-                # if __["pagesCount"] / __["epsCount"] > 60 or __["epsCount"] > 10:
-                #     continue
-                print(__["_id"], cnt)
-                cnt += 1
-                _return.append({"name": __["title"], "id": __["_id"]})
-                time.sleep(0.1)
-        return _return
-
